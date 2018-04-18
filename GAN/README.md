@@ -1,0 +1,2 @@
+<p align="center"><img width="40%;" src="https://raw.githubusercontent.com/pytorch/pytorch/master/docs/source/_static/img/pytorch-logo-dark.png"></p>
+A PyTorch implementation of <a target="_blank" href="https://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf" >Generative Adversarial Networks</a> and <a target="_blank" href="https://arxiv.org/pdf/1701.07875.pdf">Wasserstein Generative Adversarial Networks</a>

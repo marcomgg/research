@@ -8,6 +8,9 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.idea/
+.spyproject/
+.DS_Store
 env/
 build/
 develop-eggs/
@@ -24,6 +27,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.xml
+*.iml
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

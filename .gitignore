@@ -11,6 +11,7 @@ __pycache__/
 .idea/
 .spyproject/
 .DS_Store
+Backup/
 env/
 build/
 develop-eggs/

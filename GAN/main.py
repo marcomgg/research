@@ -1,13 +1,30 @@
 # -*- coding: utf-8 -*-
-
 from visdom import Visdom
 import numpy as np
 import torch
 from torch.autograd import Variable
 import torchvision.datasets as dst
 import torchvision.transforms as transforms
-import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torch.optim import Adam
+from models.models import *
 import time
+
+def update_window(vz: Visdom, win, x, y):
+    if vz.win_exists(win):
+        vz.line(
+            X=np.array(x),
+            Y=np.array(y),
+            win=win,
+            update='append'
+        )
+        return win
+    else:
+        win = vz.line(
+            X=np.array(x),
+            Y=np.array(y)
+            )
+        return win
 
 viz = Visdom()
 
@@ -17,61 +34,57 @@ while not viz.check_connection() and startup_sec > 0:
     startup_sec -= 0.1
 assert viz.check_connection(), 'No connection could be formed quickly'
 
-
-def reltol(w, wprev):
-    return (w-wprev).norm()/wprev.norm()
-
+w = 128; h = w; latent_size = 100
+batch_size = 128; num_workers = 4; k = 10
 
 root = '/mnt/DATA/TorchData'
-trans = transforms.Compose([transforms.ToTensor()])
-train_set = dst.CIFAR10(root = root, train=True, transform=trans, download=True)
-first = torch.Tensor(train_set.train_data[800, :, :, :]).mean(2)
-sobelx = torch.Tensor([[1.0,0.0,-1.0], [2.0, 0, 2.0], [1.0,0.0,-1.0]])
-gx = F.conv2d(Variable(first.view([1, 1, 32, 32])), Variable(sobelx.view([1, 1, 3, 3])))
-sobely = sobelx.transpose(0,1).clone()
-gy = F.conv2d(Variable(first.view([1, 1, 32, 32])), Variable(sobely.view([1, 1, 3, 3])))
-norm = (gx.pow(2) + gy.pow(2)).sqrt()
-norm = norm/norm.max()
-prova = torch.Tensor([1.0,4,5])
-viz.line(prova)
+trans = transforms.Compose([transforms.Resize((w, h)), transforms.RandomHorizontalFlip(), transforms.ToTensor()])
+train_set = dst.LSUN(root=root, classes=['bridge_train'], transform=trans)
+data = DataLoader(dataset=train_set, num_workers=num_workers, batch_size=batch_size, shuffle=True)
 
-x = np.tile(np.arange(1, 101), (100, 1))
-y = x.transpose()
-X = np.exp((((x - 50) ** 2) + ((y - 50) ** 2)) / -(20.0 ** 2))
-viz.contour(X=X, opts=dict(colormap='Viridis'))
+it = iter(data)
+for i in range(10):
+    first = next(it)[0]
+    viz.image(np.squeeze(first[1,:,:].numpy()))
 
-# surface
-viz.surf(X=X, opts=dict(colormap='Hot'))
+critique = Critique(w)
+generator = Generator(w)
 
-# N = 1000;
-# D = 2;
-# X = torch.rand(N, D)
-# W = torch.rand(D,1)
-# B = 10
-# x = Variable(X, requires_grad = False)
-# y = Variable(X.mm(W)+B, requires_grad = False);
-#
-# w = Variable(torch.rand(D,1), requires_grad = True)
-# b = Variable(9*torch.ones(1), requires_grad = True)
-#
-# niter = 1000
-# loss_array = np.zeros(niter)
-# reltol_array = np.zeros(niter)
-# for i in range(niter):
-#    ypred = x.mm(w) + b
-#    loss = (y-ypred).pow(2).mean()
-#    loss_array[i] = loss.data
-#    loss.backward()
-#    wprev = w.data.clone()
-#    w.data -= 0.01*w.grad.data
-#    b.data -= 0.01*b.grad.data
-#    w.grad.data.zero_()
-#    b.grad.data.zero_()
-#    reltol_array[i] = reltol(w.data, wprev)
-#
-# viz.line(loss_array)
-# viz.line(reltol_array)
-#
-#
-#
-    
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+critique.to(device)
+generator.to(device)
+
+num_epochs = 1
+
+optimizer_generator = Adam(generator.parameters())
+optimizer_critique = Adam(critique.parameters())
+
+win_loss_critique = []
+win_loss_generator = []
+
+for i in range(num_epochs):
+    for i, batch in enumerate(data, 0):
+        x = batch[0]
+        z = torch.randn((batch_size, latent_size))
+        x, z = x.to(device), z.to(device)
+
+        generator.zero_grad()
+        critique.zero_grad()
+
+        loss_critique = -torch.mean(critique(generator(z)) - critique(x))
+        loss_critique.backward()
+        optimizer_critique.step()
+
+        if i%k == 0:
+            generator.zero_grad()
+            z = torch.randn((batch_size, latent_size))
+            z = z.to(device)
+            loss_generator = torch.mean(critique(generator(z)))
+            loss_generator.backward()
+            optimizer_generator.step()
+        break
+
+
+
+

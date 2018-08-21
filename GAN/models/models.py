@@ -25,7 +25,6 @@ class Generator(nn.Module):
                         nn.BatchNorm2d(n_ch),
                         nn.Sigmoid()
                     )
-        self.apply(init_wights)
 
     def forward(self, x):
         x = self.first_layer(x)
@@ -53,14 +52,6 @@ class Critique(nn.Module):
                         nn.LeakyReLU(0.02),
                         nn.Conv2d(n_ker_first * 8, 1, self.size_last, stride=2)
                     )
-        self.apply(init_wights)
 
     def forward(self, x):
         return self.model(x).view((-1,1))
-
-def init_wights(m):
-    if type(m) == nn.Conv2d or type(m) == nn.ConvTranspose2d:
-        nn.init.normal_(m.weight, 0, 0.02)
-        m.bias.data.fill_(0.01)
-    if type(m) == nn.BatchNorm2d:
-        m.momentum = 0.4
